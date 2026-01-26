@@ -1,0 +1,14 @@
+module PacketSource::UDP;
+
+enum ReceiverImplementation %{
+	RECVMMSG,
+	IO_URING,
+%}
+
+const implementation: ReceiverImplementation;
+
+const poll_interval: interval;
+
+const udp_recv_buffer_size: count;
+
+const recvmmsg_use_selectable_fd: bool;
