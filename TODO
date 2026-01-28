@@ -1,5 +1,0 @@
-* IO_URING completion and submission queue sizes.
-
-* I think we want a much larger completion queue. We only submit a single
-  multishot RECVMSG op, so the submission queue can be really small, but
-  we might receive a lot of messages through the completion queue.

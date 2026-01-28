@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <map>
 
 #include <zeek/util.h>
 
@@ -10,21 +11,21 @@ namespace {
 
 using namespace zeek::packetsource::udp;
 
-std::tuple<std::string, ListenOptions, EncapOptions, KeyValueOptions>
+std::tuple<std::string, ListenOptions, EncapOptions>
 make_error(std::string error) {
-  return {error, {}, {}, {}};
+  return {error, {}, {}};
 }
 } // namespace
 
 namespace zeek::packetsource::udp {
 
-std::tuple<std::string, ListenOptions, EncapOptions, KeyValueOptions>
+std::tuple<std::string, ListenOptions, EncapOptions>
 parse_interface_path(const std::string &path) {
   std::string addr_str;
   std::string port_str;
   std::string opts_str; // free form query style options.
   ListenOptions listen_opts;
-  KeyValueOptions kv_opts; // parse these
+  std::map<std::string, std::string> kv_opts; // parse these
 
   // path is supposed to be: <addr>:<port>?option1=value1,option2=value2...
   // with IPv6 being surrounded with brackets like in Zeek script. An
@@ -118,10 +119,12 @@ parse_interface_path(const std::string &path) {
 
     if (k == "encap") {
       if (v == "raw") {
-        encap_opts.encap = Encapsulation::RAW;
+        // Raw is just the same as skip:0.
+        encap_opts.encap = Encapsulation::SKIP;
+        encap_opts.skip_bytes = 0;
       } else if (v.starts_with("skip:")) {
 
-        // Hand parsing of skip:8 or skip:16
+        // Parsing of skip:<offset> (skip:8, skip:16, ...)
         auto cpos = v.find(':');
         auto digits = v.substr(cpos + 1);
 
@@ -156,7 +159,7 @@ parse_interface_path(const std::string &path) {
     }
   }
 
-  return {"", listen_opts, encap_opts, std::move(kv_opts)};
+  return {"", listen_opts, encap_opts};
 }
 
 } // namespace zeek::packetsource::udp

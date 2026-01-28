@@ -1,6 +1,8 @@
 #include "packet_source.h"
 
+#ifdef HAVE_LIBURING
 #include "packet_receiver_io_uring.h"
+#endif
 #include "packet_receiver_recvmmsg.h"
 #include "packet_source_debug.h"
 #include "packet_source_options.h"
@@ -22,8 +24,7 @@ namespace zeek::packetsource::udp {
 using PktSrc = zeek::iosource::PktSrc;
 
 UDPSource::UDPSource(const std::string &path, const ListenOptions &listen_opts,
-                     const EncapOptions &encap_opts,
-                     const KeyValueOptions &kv_opts)
+                     const EncapOptions &encap_opts)
     : path(path), listen_opts(listen_opts), encap_opts(encap_opts),
       poll_interval(zeek::BifConst::PacketSource::UDP::poll_interval) {}
 
@@ -116,17 +117,25 @@ void UDPSource::Open() {
 
   if (impl == recvmmsg_impl) {
     // Make configurable.
-    size_t vlen = 1024;
-    size_t iov_len = 9216; // jumbo frames
+    size_t vlen = zeek::BifConst::PacketSource::UDP::recvmmsg_buffers;
+    size_t iov_len = zeek::BifConst::PacketSource::UDP::recvmmsg_buffer_size;
     receiver = std::make_unique<RecvmmsgPacketReceiver>(fd, vlen, iov_len);
   } else if (impl == io_uring_impl) {
-    // Make configurable.
-    size_t entries =
-        64; // I think this is wrong, we should have a small SQ and a large CQ
-    size_t buffers = 1024;
-    size_t buf_shift = 16; // 64k, not not need to worry about space.
-    receiver = std::make_unique<IOUringPacketReceiver>(fd, entries, buffers,
-                                                       buf_shift);
+#ifdef HAVE_LIBURING
+    size_t sq_entries = zeek::BifConst::PacketSource::UDP::io_uring_sq_entries;
+    size_t cq_entries = zeek::BifConst::PacketSource::UDP::io_uring_cq_entries;
+    size_t buffers = zeek::BifConst::PacketSource::UDP::io_uring_buffers;
+    size_t buffer_shift =
+        zeek::BifConst::PacketSource::UDP::io_uring_buffer_shift;
+
+    receiver = std::make_unique<IOUringPacketReceiver>(
+        fd, sq_entries, cq_entries, buffers, buffer_shift);
+#else
+    Error(util::fmt("PacketSource::UDP::IO_URING not available"));
+    close(fd);
+    fd = -1;
+    return;
+#endif
   } else {
     close(fd);
     fd = -1;
@@ -158,16 +167,16 @@ void UDPSource::Open() {
   props.netmask = NETMASK_UNKNOWN;
   props.is_live = true;
 
-  UDPSOURCE_DEBUG("Opened with receiver implementation %s",
+  UDPSOURCE_DEBUG("Opened packet source with receiver implementation %s",
                   obj_desc_short(impl).c_str());
   Opened(props);
 }
 
 void UDPSource::Close() {
-  UDPSOURCE_DEBUG("Close!");
+  // Just destruct the receiver instance for cleanup.
   receiver.reset();
 
-  if (fd > 0) {
+  if (fd >= 0) {
     if (close(fd) != 0)
       Error(util::fmt("failed to close socket fd=%d: %s (%d)", fd,
                       strerror(errno), errno));
@@ -215,14 +224,8 @@ bool UDPSource::ExtractNextPacket(zeek::Packet *pkt) {
   // the ConnKey.
   int vni = -1;
 
-  if (encap_opts.encap == Encapsulation::RAW) {
-    //
-    // RAW
-    //
-
-    // Packet payload directly in UDP, nothing to do here.
-  } else if (encap_opts.encap == Encapsulation::SKIP &&
-             pkt_data_len >= encap_opts.skip_bytes) {
+  if (encap_opts.encap == Encapsulation::SKIP &&
+      pkt_data_len >= encap_opts.skip_bytes) {
 
     pkt_data += encap_opts.skip_bytes;
     pkt_data_len -= encap_opts.skip_bytes;
@@ -325,8 +328,7 @@ bool UDPSource::SetFilter(int index) { return true; }
 // This mostly parses the path to extract all the parameters.
 PktSrc *UDPSource::Instantiate(const std::string &path, bool is_live) {
 
-  const auto [error_msg, listen_opts, encap_opts, kv_opts] =
-      parse_interface_path(path);
+  const auto [error_msg, listen_opts, encap_opts] = parse_interface_path(path);
 
   if (!error_msg.empty()) {
     zeek::reporter->FatalError("packet-source-udp: invalid path: %s",
@@ -334,7 +336,7 @@ PktSrc *UDPSource::Instantiate(const std::string &path, bool is_live) {
     return nullptr;
   }
 
-  return new UDPSource(path, listen_opts, encap_opts, kv_opts);
+  return new UDPSource(path, listen_opts, encap_opts);
 }
 
 } // namespace zeek::packetsource::udp

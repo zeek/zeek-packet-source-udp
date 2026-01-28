@@ -15,7 +15,6 @@
 #pragma once
 
 #include <arpa/inet.h>
-#include <map>
 #include <netinet/in.h>
 #include <pcap/dlt.h>
 #include <string>
@@ -40,7 +39,6 @@ struct ListenOptions {
  * The supported encapsulations.
  */
 enum class Encapsulation {
-  RAW,
   SKIP,
   VXLAN,
   GENEVE,
@@ -56,22 +54,15 @@ struct EncapOptions {
 };
 
 /**
- * Generic key value options to pass to the receiver.
- *
- * Can be used for receive buffer configuration and stuff.
- */
-using KeyValueOptions = std::map<std::string, std::string>;
-
-/**
  * Parse an interface path for the packet source.
  *
  * @param path
  *
- * @return A tuple <error_msg, listen_opts, encap_opts, kv_opts>
+ * @return A tuple <error_msg, listen_opts, encap_opts>
  *
  * If error_msg is not empty, parsing failed and the string describes the issue.
  */
-std::tuple<std::string, ListenOptions, EncapOptions, KeyValueOptions>
+std::tuple<std::string, ListenOptions, EncapOptions>
 parse_interface_path(const std::string &path);
 
 } // namespace zeek::packetsource::udp

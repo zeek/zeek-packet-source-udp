@@ -54,7 +54,7 @@ protected:
 
 private:
   UDPSource(const std::string &path, const ListenOptions &listen_opts,
-            const EncapOptions &encap_opts, const KeyValueOptions &kv_opts);
+            const EncapOptions &encap_opts);
   virtual ~UDPSource() = default;
 
   std::string path; // The original interface path.

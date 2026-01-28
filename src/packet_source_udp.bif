@@ -12,3 +12,10 @@ const poll_interval: interval;
 const udp_recv_buffer_size: count;
 
 const recvmmsg_use_selectable_fd: bool;
+const recvmmsg_buffers: count;
+const recvmmsg_buffer_size: count;
+
+const io_uring_sq_entries: count;
+const io_uring_cq_entries: count;
+const io_uring_buffers: count;
+const io_uring_buffer_shift: count;

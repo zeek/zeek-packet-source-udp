@@ -17,19 +17,26 @@
 
 namespace zeek::packetsource::udp {
 
-IOUringPacketReceiver::IOUringPacketReceiver(int fd, size_t entries,
-                                             size_t buffers, size_t buf_shift)
-    : fd(fd), entries(entries), buffers(buffers), buf_shift(buf_shift),
-      buf_size(1 << buf_shift) {
-  cqes.resize(entries);
-  memset(&msg, 0, sizeof(struct msghdr));
+IOUringPacketReceiver::IOUringPacketReceiver(int fd, size_t sq_entries,
+                                             size_t cq_entries, size_t buffers,
+                                             size_t buf_shift)
+    : fd(fd), sq_entries(sq_entries), cq_entries(cq_entries), buffers(buffers),
+      buf_shift(buf_shift), buf_size(1 << buf_shift) {
 
-  // SO_TIMESTAMP is in effect. Make some room.
-  const size_t cmsg_len = CMSG_LEN(sizeof(struct timeval));
-  msg.msg_controllen = cmsg_len;
+  // SO_TIMESTAMP is in effect. Make enough room. Might want to inject this?
+  msg.msg_controllen = CMSG_LEN(sizeof(struct timeval));
+
+  // Allocate room for the CQ entries.
+  cqes.resize(cq_entries);
 }
 
-IOUringPacketReceiver::~IOUringPacketReceiver() {}
+IOUringPacketReceiver::~IOUringPacketReceiver() {
+  UDPSOURCE_DEBUG("Teardown...");
+  if (mapped != MAP_FAILED)
+    munmap(mapped, buf_ring_size);
+
+  io_uring_queue_exit(&ring);
+}
 
 namespace {
 
@@ -61,12 +68,22 @@ bool IOUringPacketReceiver::Open() {
   int ret;
   int flags = 0;
 
-  if (io_uring_queue_init(entries, &ring, flags) < 0) {
-    fprintf(stderr, "failed to init io_uring_queue: %s", strerror(errno));
+  struct io_uring_params params = {
+      .sq_entries = static_cast<uint32_t>(sq_entries),
+      .cq_entries = static_cast<uint32_t>(cq_entries),
+  };
+
+  UDPSOURCE_DEBUG("io_uring_queue_init_params() with sq=%zu cq=%zu", sq_entries,
+                  cq_entries);
+
+  if (io_uring_queue_init_params(sq_entries, &ring, &params) < 0) {
+    fprintf(stderr, "init_uring_queue_init_params() failed: %s",
+            strerror(errno));
     return false;
   }
 
   buf_ring_size = (sizeof(io_uring_buf) + buf_size) * buffers;
+  UDPSOURCE_DEBUG("mmap() with buf_ring_size=%zu bytes", buf_ring_size);
 
   void *mapped = mmap(NULL, buf_ring_size, PROT_READ | PROT_WRITE,
                       MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
@@ -90,8 +107,8 @@ bool IOUringPacketReceiver::Open() {
 
   ret = io_uring_register_buf_ring(&ring, &reg, 0);
   if (ret != 0) {
-    fprintf(stderr, "io_uring_register_buf_ring() failed: %s (%d)\n",
-            strerror(errno), errno);
+    fprintf(stderr, "io_uring_register_buf_ring() failed: %s\n",
+            strerror(errno));
     return false;
   }
 
@@ -100,17 +117,22 @@ bool IOUringPacketReceiver::Open() {
     io_uring_buf_ring_add(buf_ring, buf, buf_size, i,
                           io_uring_buf_ring_mask(buffers), i);
   }
+
   io_uring_buf_ring_advance(buf_ring, buffers);
 
-  // Register fd as a file.
+  // Register fd as a file for IOSQE_FIXED_FILE usage.
   ret = io_uring_register_files(&ring, &fd, 1);
   if (ret < 0) {
-    fprintf(stderr, "io_uring_register_files() failed: %s (%d)\n",
-            strerror(errno), errno);
+    fprintf(stderr, "io_uring_register_files() failed: %s\n", strerror(errno));
     return false;
   }
 
-  add_recvmsg_multishot(&ring, &msg, /*fdidx=*/0);
+  // Submit our first (and only) OP.
+  if (add_recvmsg_multishot(&ring, &msg, /*fdidx=*/0) < 0) {
+    fprintf(stderr, "add_recvmsg_multishot() failed: %s (%d)\n",
+            strerror(errno), errno);
+    return false;
+  }
 
   ret = io_uring_submit(&ring);
   UDPSOURCE_DEBUG("io_uring_submit() ret=%d", ret);
