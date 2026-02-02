@@ -29,10 +29,13 @@ zeek_add_plugin(
   Zeek
   PacketSourceUDP
   SOURCES
-  src/plugin.cc
+  src/packet_receiver_recvmmsg.cc
   src/packet_source.cc
   src/packet_source_options.cc
-  src/packet_receiver_recvmmsg.cc
+  src/plugin.cc
+  src/conn_key/vxlan.cc
+  src/conn_key/geneve.cc
+  src/conn_key/geneve_vxlan.cc
   ${_io_uring_src}
   BIFS
   src/packet_source_udp.bif

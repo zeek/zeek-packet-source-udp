@@ -51,6 +51,8 @@ enum class Encapsulation {
   SKIP,
   VXLAN,
   GENEVE,
+  GENEVE_VXLAN, // Outer layer GENEVE, then IP/UDP+VXLAN containing the mirrored
+                // packet. There is no ethernet header after GENEVE!
 };
 
 /**

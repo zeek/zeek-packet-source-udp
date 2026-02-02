@@ -133,6 +133,12 @@ parse_interface_path(const std::string &path) {
             "encapsulation already set - unexpected '%s'", opt_str.c_str()));
 
       eopts.encap = Encapsulation::GENEVE;
+    } else if (opt_str == "geneve+vxlan") {
+      if (eopts.encap != Encapsulation::UNSET)
+        return make_error(util::fmt(
+            "encapsulation already set - unexpected '%s'", opt_str.c_str()));
+
+      eopts.encap = Encapsulation::GENEVE_VXLAN;
     } else {
       // No encapsulation, check for supported link types.
 

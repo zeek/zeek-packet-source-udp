@@ -13,6 +13,7 @@ tunnels like VXLAN or GENEVE. This is often the case in cloud environments like
 in the case of [AWS Traffic Mirroring](https://docs.aws.amazon.com/vpc/latest/mirroring/what-is-traffic-mirroring.html)
 or [GCP Network Security Integration](https://cloud.google.com/blog/products/networking/introducing-network-security-integration).
 
+
 ## Idea
 
 The conceptual idea is to make Zeek a high-performance UDP packet receiver
@@ -32,9 +33,20 @@ contained packet data forwarded to Zeek. For monitoring a single VPC, this shoul
 be sufficient. If these layers aren't stripped, Zeek would track and log the
 mirroring tunnel connections, too, something that usually isn't all that useful.
 
-A future extension planned is to expose the tunnel VNIs and options of the
-encapsulation headers using a custom ConnKey plugin as sketched in
-[Zeek's plugin documentation for ConnKeys](https://docs.zeek.org/en/master/devel/plugins/connkey-plugin.html).
+
+## Build and Install
+
+This plugin does not contain a configure script and also no extra Zeek scripts,
+so you may install it using ``cmake`` directly:
+
+    $ mkdir build && cd build && cmake ../ && make && make install
+
+Or, use ``zkg``:
+
+    $ zkg install zeek-packet-source-udp
+
+If you want to test the io_uring implementation, ensure you have a recent
+version of liburing installed.
 
 
 ## Performance and Scaling
@@ -66,19 +78,57 @@ this should result in decent and reliable flow-balancing across Zeek's worker
 processes.
 
 
-## Build and Install
+## ConnKey Integration
 
-This plugin does not contain a configure script and also no extra Zeek scripts,
-so you may install it using ``cmake`` directly:
+This plugin ships with three ConnKey implementations similar to the one sketched
+in  [Zeek's plugin documentation](https://docs.zeek.org/en/master/devel/plugins/connkey-plugin.html).
 
-    $ mkdir build && cd build && cmake ../ && make && make install
+By default, however, none of these is loaded. That means, that overlapping IP ranges
+from different monitoring sessions have a potential to conflict. I.e. 192.168.0.1
+from one mirror session is indistinguishable from 192.168.0.1 of another mirror
+session. To include either the GENVE VNI or VXLAN VNI, or the VNIs from both layers
+(for the ``geneve+vxlan`` encapsulation) load the corresponding scripts shipped within
+this plugin:
 
-Or, use ``zkg``:
+    @load policy/frameworks/conn_key/packet_source/udp/vxlan_vni
 
-    $ zkg install zeek-packet-source-udp
+    @load policy/frameworks/conn_key/packet_source/udp/geneve_vni
+
+    @load policy/frameworks/conn_key/packet_source/udp/geneve_vxlan_vni
+
+The ``conn_id_ctx`` record type will be extended with a ``gevene_vni`` field,
+a ``vxlan_vni`` or both when loading these scripts.
+
+There is no auto-detection or auto-loading of the applicable ConnKey implementation.
+Technically we could look at the interface path, but the preference here is to
+use an explicit ``@load`` to enable these. This also allows to test the effect
+of the ConnKey plugin nicely. This plugin is meant to be used in environments
+where the encapsulation is consistent and static. If this doesn't apply to your
+environment, fork the repo and adapt the code to your needs.
+
+A conn.log record with both VNIs (when using the geneve_vxlan_vni script)
+looks as follows:
+
+    {
+      "ts": 1770052116.800996,
+      "uid": "C15cDG2P4Znvk4uO9g",
+      "id.orig_h": "172.20.10.3",
+      "id.orig_p": 59588,
+      "id.resp_h": "199.60.103.106",
+      "id.resp_p": 80,
+      "id.ctx.geneve_vni": 4711,
+      "id.ctx.vxlan_vni": 4242,
+      "proto": "tcp",
+      "service": "http",
+      ...
+
+Note that the ConnKey implementations provided by this plugin only work with live
+traffic using the packet source in this plugin.
 
 
-## How to Run
+## Usage
+
+### Ad-hoc Usage
 
 Use ``-i`` as usual. Instead of passing an interface name, however, pass something
 like: ``udp::<listen_addr>:<listen_port>:<encap>:dlt=<link_type>``.
@@ -88,12 +138,14 @@ can be left out for simple testing with VXLAN:
 
     $ zeek -i udp::127.0.0.1:4789
 
-## Usage with ZeekControl
+
+### ZeekControl Usage
 
 Set the ``interface`` key in ``node.cfg`` to ``udp::0.0.0.0:4789:vxlan``, then
 run the typical ``zeekctl deploy`` steps. Use ``zeectl diag`` to check for errors.
 
-## Usage with zeek-systemd-generator
+
+### zeek-systemd-generator Usage
 
 If a single host deployment is sufficient for your purposes and you have Zeek 8.1
 available, you may look into [Zeek's systemd-generator](https://github.com/zeek/zeek/tree/master/tools/systemd-generator)
@@ -119,12 +171,17 @@ The ``encap`` option can be set to one of:
 
 * vxlan
 * geneve
+* geneve+vxlan
 * raw
 * skip=<offset>
 
-For VXLAN or GENEVE, the header is stripped and the inner packet and its timestamp
-passed to Zeek via the``zeek::Packet`` data structure. The ``raw`` option results
-in the UDP payload being passed as packet payload without stripping any headers.
+For VXLAN or GENEVE, their header is stripped and the inner packet and its timestamp
+passed to Zeek via the``zeek::Packet`` data structure. For ``genve+vxlan``, first
+the GENEVE header is stripped and IP/UDP headers expected to follow. These are also
+stripped as well as the 8 byte VXLAN header that follows. The ``geneve+vxlan`` is
+primarily for for AWS GWLB environments.
+
+The ``raw`` option results in the UDP payload being passed as packet payload without stripping any headers.
 The ``skip=<offset>`` option allows to skip a fixed number of bytes into the UDP
 payload. This can be useful for unsupported encapsulations with fixed header sizes.
 For example, ``vxlan`` and ``skip=8`` behave identically, except for ``vxlan``
@@ -144,6 +201,7 @@ For example, if the traffic arrives as GENEVE encapsulated IP packets without
 a ethernet header, use the following invocation:
 
     zeek -i udp::[::1]:6081:geneve:dlt=raw
+
 
 ## Tuning and Monitoring
 
@@ -179,6 +237,7 @@ Check and increase ``netdev_max_backlog`` if needed:
     $ sysctl -a -r net.core.netdev_max_backlog
     net.core.netdev_max_backlog = 1000
     $ sysctl -w net.core.netdev_max_backlog=10000
+
 
 ## Requirements on the Packet Mirroring Infrastructure
 

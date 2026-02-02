@@ -23,6 +23,9 @@ namespace zeek::packetsource::udp {
 
 using PktSrc = zeek::iosource::PktSrc;
 
+int UDPSource::vxlan_vni = -1;
+int UDPSource::geneve_vni = -1;
+
 UDPSource::UDPSource(const std::string &path, const ListenOptions &listen_opts,
                      const EncapOptions &encap_opts)
     : path(path), listen_opts(listen_opts), encap_opts(encap_opts),
@@ -210,7 +213,7 @@ bool UDPSource::ExtractNextPacket(zeek::Packet *pkt) {
 
 #define NO_PACKET_DEBUG
 #ifdef PACKET_DEBUG
-  constexpr int print_bytes = 16;
+  constexpr int print_bytes = 32;
   for (int i = 0; i < rpkt.len && i < print_bytes; i++) {
     std::fprintf(stderr, "%02x%s", rpkt.data[i],
                  i < (print_bytes - 1) ? ":" : "");
@@ -218,23 +221,109 @@ bool UDPSource::ExtractNextPacket(zeek::Packet *pkt) {
   std::fprintf(stderr, " \n");
 #endif
 
-  // The tricky part here is a bit how to propagate VNI to Zeek. We could
-  // provide a custom ConnKey implementation and gather it via an accessor
-  // or global variable as a downcall. Or just a bif if we don't care for
-  // the ConnKey.
-  int vni = -1;
-
-  if (encap_opts.encap == Encapsulation::SKIP &&
-      pkt_data_len >= encap_opts.skip_bytes) {
+  switch (encap_opts.encap) {
+  case Encapsulation::SKIP: {
+    //
+    // skip
+    //
+    if (pkt_data_caplen < encap_opts.skip_bytes)
+      goto skip_packet;
 
     pkt_data += encap_opts.skip_bytes;
     pkt_data_len -= encap_opts.skip_bytes;
     pkt_data_caplen -= encap_opts.skip_bytes;
+    break;
+  }
+  case Encapsulation::GENEVE_VXLAN:
+  case Encapsulation::GENEVE: {
+    //
+    // GENVE
+    //
+    if (pkt_data_caplen < 8)
+      goto skip_packet;
 
-  } else if (encap_opts.encap == Encapsulation::VXLAN && pkt_data_len >= 8) {
+    int geneve_version = pkt_data[0] >> 6;
+
+    if (geneve_version != 0) {
+      zeek::reporter->Weird("geneve_invalid_version",
+                            util::fmt("%d", geneve_version),
+                            "packet-source-udp");
+
+      goto skip_packet_no_weird;
+    }
+
+    // Extract VNI for ConnKey implementations.
+    geneve_vni = pkt_data[4] << 16 | pkt_data[5] << 8 | pkt_data[6];
+
+    // Jump the GENEVE header and all options.
+    uint8_t all_opt_len = (pkt_data[0] & 0x3F) * 4;
+
+    if (pkt_data_caplen < (all_opt_len + 8)) {
+      zeek::reporter->Weird("geneve_too_short",
+                            util::fmt("pkt_data_caplen=%zu all_opt_len=%d",
+                                      pkt_data_caplen, all_opt_len),
+                            "packet-source-udp");
+      goto skip_packet_no_weird;
+    }
+
+    pkt_data += (8 + all_opt_len);
+    pkt_data_len -= (8 + all_opt_len);
+    pkt_data_caplen -= (8 + all_opt_len);
+
+    // Only GENEVE encapsulated.
+    if (encap_opts.encap == Encapsulation::GENEVE)
+      break;
+
+    assert(encap_opts.encap == Encapsulation::GENEVE_VXLAN);
+
+    // If this is GENEVE_VXLAN, parse the IP header and ump it.
+    if (pkt_data_caplen < 20) {
+      zeek::reporter->Weird("short_IP_in_GENEVE",
+                            util::fmt("%zu", pkt_data_caplen),
+                            "packet-source-udp");
+      goto skip_packet_no_weird;
+    }
+
+    int ip_version = pkt_data[0] >> 4;
+    if (ip_version != 4) {
+      zeek::reporter->Weird("unhandled IP version", util::fmt("%d", ip_version),
+                            "packet-source-udp");
+      goto skip_packet_no_weird;
+    }
+
+    // TODO: IPV6 support. Just jump 40 bytes and ignore
+    // any extension headers?
+    uint8_t ihl = pkt_data[0] & 0x0F;
+    size_t header_len = ihl * 4;
+
+    if (header_len < 20 || header_len > pkt_data_caplen) {
+      zeek::reporter->Weird(
+          "invalid_IP_header_length",
+          util::fmt("ihl=%d caplen=%zu", ihl, pkt_data_caplen),
+          "packet-source-udp");
+      goto skip_packet_no_weird;
+    }
+
+    uint8_t proto = pkt_data[9];
+    if (proto != IPPROTO_UDP) {
+      zeek::reporter->Weird("non_UDP_proto", util::fmt("proto=%d", proto),
+                            "packet-source-udp");
+      goto skip_packet_no_weird;
+    }
+
+    // Jump IP and UDP header.
+    pkt_data += (header_len + 8);
+    pkt_data_caplen -= (header_len + 8);
+    pkt_data_len -= (header_len + 8);
+
+    /* fall through to VXLAN handling */
+  }
+  case Encapsulation::VXLAN: {
     //
     // VXLAN
     //
+    if (pkt_data_caplen < 8)
+      goto skip_packet;
 
     // Test the I flag of VXLAN. If not set, weird and ignore.
     if ((pkt_data[0] & 0x08) == 0) {
@@ -242,52 +331,39 @@ bool UDPSource::ExtractNextPacket(zeek::Packet *pkt) {
                             util::fmt("%02x", pkt_data[0]),
                             "packet-source-udp");
 
-      ++invalid_packets;
-      receiver->DoneWithPacket();
-      return false;
+      goto skip_packet_no_weird;
     }
 
-    vni = pkt_data[4] << 16 | pkt_data[5] << 8 | pkt_data[6];
+    // Extract VNI for ConnKey implementations.
+    vxlan_vni = pkt_data[4] << 16 | pkt_data[5] << 8 | pkt_data[6];
 
     // Jump the VXLAN header.
     pkt_data += 8;
     pkt_data_len -= 8;
     pkt_data_caplen -= 8;
 
-  } else if (encap_opts.encap == Encapsulation::GENEVE && pkt_data_len > 8) {
-    //
-    // GENVE
-    //
-
-    int version = pkt_data[0] >> 6;
-    vni = pkt_data[4] << 16 | pkt_data[5] << 8 | pkt_data[6];
-
-    if (version != 0) {
-      zeek::reporter->Weird("geneve_invalid_version", util::fmt("%d", version),
-                            "packet-source-udp");
-
-      ++invalid_packets;
-      receiver->DoneWithPacket();
-      return false;
-    }
-
-    // Jump the GENEVE header and all options.
-    uint8_t all_opt_len = (pkt_data[0] & 0x3F) * 4;
-    pkt_data += (8 + all_opt_len);
-    pkt_data_len -= (8 + all_opt_len);
-    pkt_data_caplen -= (8 + all_opt_len);
-  } else {
-    zeek::reporter->Weird("packet_too_short", util::fmt("%zu", pkt_data_len),
-                          "packet-source-udp");
-
-    ++invalid_packets;
-    receiver->DoneWithPacket();
-    return false;
+    break;
+  }
+  default:
+    goto skip_packet;
   }
 
+  // Success path.
   pkt->Init(link_type, rpkt.ts, pkt_data_caplen, pkt_data_len, pkt_data);
-
   return true;
+
+  // Error path.
+
+skip_packet:
+  zeek::reporter->Weird("skipped_packet",
+                        util::fmt("pkt_data_len=%zu encap=%d", pkt_data_len,
+                                  static_cast<int>(encap_opts.encap)),
+                        "packet-source-udp");
+
+skip_packet_no_weird:
+  ++invalid_packets;
+  receiver->DoneWithPacket();
+  return false;
 }
 
 void UDPSource::DoneWithPacket() { receiver->DoneWithPacket(); }
@@ -312,9 +388,9 @@ void UDPSource::Statistics(PktSrc::Stats *arg_stats) {
   if (getsockopt(fd, SOL_SOCKET, SO_RXQ_OVFL, &dropped, &dropped_len) == 0) {
     arg_stats->dropped = dropped;
   } else {
-    zeek::reporter->Error(
-        "packet-source-udp: getsockopt(SO_RXQ_OVFL) error on fd=%d: %s (%d)",
-        fd, strerror(errno), errno);
+    zeek::reporter->Error("packet-source-udp: getsockopt(SO_RXQ_OVFL) "
+                          "error on fd=%d: %s (%d)",
+                          fd, strerror(errno), errno);
     arg_stats->dropped = 0;
   }
 

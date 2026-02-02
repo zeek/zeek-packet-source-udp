@@ -16,6 +16,15 @@ class UDPSource : public PktSrc {
 public:
   static PktSrc *Instantiate(const std::string &path, bool is_live);
 
+  /**
+   * Return the currently stored VXLAN VNI value or -1 if VXLAN is not used.
+   */
+  static int VxlanVni() { return vxlan_vni; }
+  /**
+   * Return the GENEVE VNI value or -1 if GENEVE is not used.
+   */
+  static int GeneveVni() { return geneve_vni; }
+
 protected:
   /**
    * @copydoc PktSrc::Open
@@ -68,6 +77,11 @@ private:
   int fd = -1;
   bool had_packet = true;
   double poll_interval = 0.0;
+
+  // Globals for stashing the VXLAN and GENEVE VNI
+  // values for use in custom ConnKey values.
+  static int vxlan_vni;
+  static int geneve_vni;
 };
 
 } // namespace zeek::packetsource::udp
