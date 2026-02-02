@@ -1,5 +1,7 @@
 #include "plugin.h"
 #include "packet_source.h"
+#include "packet_source_debug.h"
+#include "packet_source_options.h"
 #include <zeek/iosource/Component.h>
 #include <zeek/iosource/PktSrc.h>
 
@@ -17,6 +19,14 @@ zeek::plugin::Configuration Plugin::Configure() {
   config.version = {VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH};
 
   return config;
+}
+
+void Plugin::InitPostScript() {
+
+  // Run unit tests at InitPostScript() time.
+  UDPSOURCE_DEBUG("Running unit tests...");
+  zeek::packetsource::udp::test_parse_interface_path();
+  UDPSOURCE_DEBUG("Finished unit tests...");
 }
 
 // Instantiate plugin.
