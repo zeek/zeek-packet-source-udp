@@ -79,7 +79,7 @@ VxlanVniFactory::DoConnKeyFromVal(const zeek::Val &v) const {
   auto *ctx = v.AsRecordVal()->GetFieldAs<zeek::RecordVal>(ctx_offset);
 
   if (vni_offset < 0)
-    return zeek::unexpected<std::string>{"missing vlxan_vni field"};
+    return zeek::unexpected<std::string>{"missing vxlan_vni field"};
 
   if (ctx->HasField(vni_offset))
     k->key.vxlan_vni = ctx->GetFieldAs<zeek::CountVal>(vni_offset);

@@ -44,7 +44,7 @@ void UDPSource::Open() {
   auto buf =
       static_cast<int>(zeek::BifConst::PacketSource::UDP::udp_recv_buffer_size);
   if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &buf, sizeof(buf)) < 0) {
-    Error(util::fmt("failed setsockopt()for SO_RCVBUF: %s", strerror(errno)));
+    Error(util::fmt("failed setsockopt() for SO_RCVBUF: %s", strerror(errno)));
     close(fd);
     fd = -1;
     return;
@@ -142,7 +142,7 @@ void UDPSource::Open() {
   } else {
     close(fd);
     fd = -1;
-    Error(util::fmt("unknown implemenation %s", obj_desc_short(impl).c_str()));
+    Error(util::fmt("unknown implementation %s", obj_desc_short(impl).c_str()));
     return;
   }
 

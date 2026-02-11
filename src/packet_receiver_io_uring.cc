@@ -77,7 +77,7 @@ bool IOUringPacketReceiver::Open() {
                   cq_entries);
 
   if (io_uring_queue_init_params(sq_entries, &ring, &params) < 0) {
-    fprintf(stderr, "init_uring_queue_init_params() failed: %s",
+    fprintf(stderr, "io_uring_queue_init_params() failed: %s",
             strerror(errno));
     return false;
   }
