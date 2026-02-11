@@ -85,8 +85,8 @@ bool IOUringPacketReceiver::Open() {
   buf_ring_size = (sizeof(io_uring_buf) + buf_size) * buffers;
   UDPSOURCE_DEBUG("mmap() with buf_ring_size=%zu bytes", buf_ring_size);
 
-  void *mapped = mmap(NULL, buf_ring_size, PROT_READ | PROT_WRITE,
-                      MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
+  mapped = mmap(NULL, buf_ring_size, PROT_READ | PROT_WRITE,
+                MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
 
   if (mapped == MAP_FAILED) {
     fprintf(stderr, "mmap() failed: %s (%d)", strerror(errno), errno);
