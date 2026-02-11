@@ -183,6 +183,7 @@ void UDPSource::Close() {
     if (close(fd) != 0)
       Error(util::fmt("failed to close socket fd=%d: %s (%d)", fd,
                       strerror(errno), errno));
+    fd = -1;
   }
 
   Closed();
@@ -383,15 +384,16 @@ void UDPSource::Statistics(PktSrc::Stats *arg_stats) {
 
   *arg_stats = stats;
 
-  uint32_t dropped;
-  socklen_t dropped_len = sizeof(dropped);
-  if (getsockopt(fd, SOL_SOCKET, SO_RXQ_OVFL, &dropped, &dropped_len) == 0) {
-    arg_stats->dropped = dropped;
-  } else {
-    zeek::reporter->Error("packet-source-udp: getsockopt(SO_RXQ_OVFL) "
-                          "error on fd=%d: %s (%d)",
-                          fd, strerror(errno), errno);
-    arg_stats->dropped = 0;
+  if (fd >= 0) {
+    uint32_t dropped;
+    socklen_t dropped_len = sizeof(dropped);
+    if (getsockopt(fd, SOL_SOCKET, SO_RXQ_OVFL, &dropped, &dropped_len) == 0) {
+      arg_stats->dropped = stats.dropped = dropped;
+    } else {
+      zeek::reporter->Error("packet-source-udp: getsockopt(SO_RXQ_OVFL) "
+                            "error on fd=%d: %s (%d)",
+                            fd, strerror(errno), errno);
+    }
   }
 
   // Add invalid packets to dropped ones.
