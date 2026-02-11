@@ -29,6 +29,6 @@ public:
 
   virtual bool NextPacket(RawPacket *pkt) = 0;
   virtual void DoneWithPacket() = 0;
-}; // namespace zeek::packetsource::udp
+};
 
 } // namespace zeek::packetsource::udp
