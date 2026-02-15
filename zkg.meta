@@ -3,5 +3,5 @@ name = zeek-packet-source-udp
 description = An opinionated Zeek packet source for the cloud.
 tags = udp zeek vxlan geneve io_uring recvmmsg
 plugin_dir = build
-build_command = mkdir build && cd build && cmake ../ && make -j
+build_command = mkdir build && cd build && cmake ../ && make
 test_command = true
