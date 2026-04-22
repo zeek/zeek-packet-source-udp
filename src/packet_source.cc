@@ -227,7 +227,8 @@ bool UDPSource::ExtractNextPacket(zeek::Packet *pkt) {
     //
     // skip
     //
-    if (pkt_data_caplen < encap_opts.skip_bytes)
+    assert(encap_opts.skip_bytes >= 0);
+    if (pkt_data_caplen < static_cast<size_t>(encap_opts.skip_bytes))
       goto skip_packet;
 
     pkt_data += encap_opts.skip_bytes;
@@ -257,11 +258,11 @@ bool UDPSource::ExtractNextPacket(zeek::Packet *pkt) {
     geneve_vni = pkt_data[4] << 16 | pkt_data[5] << 8 | pkt_data[6];
 
     // Jump the GENEVE header and all options.
-    uint8_t all_opt_len = (pkt_data[0] & 0x3F) * 4;
+    auto all_opt_len = static_cast<size_t>(pkt_data[0] & 0x3F) * 4;
 
     if (pkt_data_caplen < (all_opt_len + 8)) {
       zeek::reporter->Weird("geneve_too_short",
-                            util::fmt("pkt_data_caplen=%zu all_opt_len=%d",
+                            util::fmt("pkt_data_caplen=%zu all_opt_len=%zu",
                                       pkt_data_caplen, all_opt_len),
                             "packet-source-udp");
       goto skip_packet_no_weird;
