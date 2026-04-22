@@ -3,11 +3,6 @@
 #ifdef HAVE_LIBURING
 #include "packet_receiver_io_uring.h"
 #endif
-#include "packet_receiver_recvmmsg.h"
-#include "packet_source_debug.h"
-#include "packet_source_options.h"
-#include "packet_source_udp.bif.h"
-
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -18,6 +13,11 @@
 #include <zeek/Desc.h>
 #include <zeek/iosource/PktSrc.h>
 #include <zeek/util.h>
+
+#include "packet_receiver_recvmmsg.h"
+#include "packet_source_debug.h"
+#include "packet_source_options.h"
+#include "packet_source_udp.bif.h"
 
 namespace zeek::packetsource::udp {
 
