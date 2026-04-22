@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
 
+get_directory_property(is_subproject PARENT_DIRECTORY)
+if (NOT is_subproject)
 include(cmake/bootstrap.cmake)
+endif()
 
 project(Plugin)
 
