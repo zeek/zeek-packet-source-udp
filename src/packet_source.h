@@ -13,6 +13,8 @@ using PktSrc = zeek::iosource::PktSrc;
 
 class UDPSource : public PktSrc {
 public:
+    ~UDPSource() override = default;
+
     static PktSrc* Instantiate(const std::string& path, bool is_live);
 
     /**
@@ -61,8 +63,7 @@ protected:
     bool SetFilter(int index) override;
 
 private:
-    UDPSource(const std::string& path, const ListenOptions& listen_opts, const EncapOptions& encap_opts);
-    virtual ~UDPSource() = default;
+    UDPSource(std::string path, const ListenOptions& listen_opts, const EncapOptions& encap_opts);
 
     std::string path; // The original interface path.
     ListenOptions listen_opts;

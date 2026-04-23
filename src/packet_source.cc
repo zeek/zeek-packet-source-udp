@@ -26,8 +26,8 @@ using PktSrc = zeek::iosource::PktSrc;
 int UDPSource::vxlan_vni = -1;
 int UDPSource::geneve_vni = -1;
 
-UDPSource::UDPSource(const std::string& path, const ListenOptions& listen_opts, const EncapOptions& encap_opts)
-    : path(path),
+UDPSource::UDPSource(std::string path, const ListenOptions& listen_opts, const EncapOptions& encap_opts)
+    : path(std::move(path)),
       listen_opts(listen_opts),
       encap_opts(encap_opts),
       poll_interval(zeek::BifConst::PacketSource::UDP::poll_interval) {}
@@ -103,7 +103,7 @@ void UDPSource::Open() {
 
     UDPSOURCE_DEBUG("Binding socket fd=%d", fd);
     socklen_t addr_len = listen_opts.af == AF_INET6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in);
-    if ( bind(fd, (const struct sockaddr*)&listen_opts.addr, addr_len) < 0 ) {
+    if ( bind(fd, reinterpret_cast<const struct sockaddr*>(&listen_opts.addr), addr_len) < 0 ) {
         Error(util::fmt("failed to listen: %s", strerror(errno)));
         close(fd);
         fd = -1;
@@ -281,7 +281,7 @@ bool UDPSource::ExtractNextPacket(zeek::Packet* pkt) {
             // TODO: IPV6 support. Just jump 40 bytes and ignore
             // any extension headers?
             uint8_t ihl = pkt_data[0] & 0x0F;
-            size_t header_len = ihl * 4;
+            size_t header_len = static_cast<size_t>(ihl) * 4;
 
             if ( header_len < 20 || header_len > pkt_data_caplen ) {
                 zeek::reporter->Weird("invalid_IP_header_length", util::fmt("ihl=%d caplen=%zu", ihl, pkt_data_caplen),
