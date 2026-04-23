@@ -78,7 +78,12 @@ void UDPSource::Open() {
     // https://lwn.net/Articles/542629/
     UDPSOURCE_DEBUG("Enabling SO_REUSEPORT on fd=%d", fd);
     int reuseport = 1;
+#if defined(SO_REUSEPORT_LB)
+    // FreeBSD has this feature, too. But it's behind SO_REUSEPORT_LB.
+    if ( setsockopt(fd, SOL_SOCKET, SO_REUSEPORT_LB, &reuseport, sizeof(reuseport)) < 0 ) {
+#else
     if ( setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &reuseport, sizeof(reuseport)) < 0 ) {
+#endif
         Error(util::fmt("failed setsockopt for SO_REUSEPORT: %s", strerror(errno)));
         close(fd);
         fd = -1;
