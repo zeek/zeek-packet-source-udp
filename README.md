@@ -239,6 +239,15 @@ Check and increase ``netdev_max_backlog`` if needed:
     $ sysctl -w net.core.netdev_max_backlog=10000
 
 
+## FreeBSD
+
+On FreeBSD, the default ``udp_recv_buffer_size`` of 16M is too large
+for the kernel defaults. Run the following as root and/or add it ``/etc/sysctl.conf``
+to persist the change to bump it to 64M.
+
+    $ sysctl -w kern.ipc.maxsockbuf=67108864
+
+
 ## Requirements on the Packet Mirroring Infrastructure
 
 As mentioned above, this packet source plugin is sensitive to the values used
