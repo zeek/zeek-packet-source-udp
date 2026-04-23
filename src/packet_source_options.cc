@@ -11,7 +11,7 @@ namespace {
 
 using namespace zeek::packetsource::udp;
 
-std::tuple<std::string, ListenOptions, EncapOptions> make_error(std::string error) { return {error, {}, {}}; }
+std::tuple<std::string, ListenOptions, EncapOptions> make_error(const std::string& error) { return {error, {}, {}}; }
 
 } // namespace
 
@@ -105,7 +105,7 @@ std::tuple<std::string, ListenOptions, EncapOptions> parse_interface_path(const 
             auto cpos = opt_str.find('=');
             auto digits = opt_str.substr(cpos + 1);
 
-            if ( digits.empty() || ! std::all_of(digits.begin(), digits.end(), isdigit) )
+            if ( digits.empty() || ! std::ranges::all_of(digits.begin(), digits.end(), isdigit) )
                 return make_error(util::fmt("invalid skip: '%s'", opt_str.c_str()));
 
             eopts.encap = Encapsulation::SKIP;
@@ -178,6 +178,7 @@ namespace {
 int failed_assertions = 0;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define myassert(cond, ...)                                                                                            \
     if ( ! (cond) ) {                                                                                                  \
         fprintf(stderr, "%s:%d: ", __FILE__, __LINE__);                                                                \

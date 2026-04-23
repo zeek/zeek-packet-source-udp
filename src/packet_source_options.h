@@ -40,14 +40,14 @@ struct ListenOptions {
     union {
         sockaddr_in v4;
         sockaddr_in6 v6;
-    } addr = {0};
+    } addr = {{0}};
     int port = -1;
 };
 
 /**
  * The supported encapsulations.
  */
-enum class Encapsulation {
+enum class Encapsulation : uint8_t {
     UNSET,
     SKIP,
     VXLAN,
