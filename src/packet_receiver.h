@@ -10,9 +10,9 @@ namespace zeek::packetsource::udp {
  * the original UDP header.
  */
 struct RawPacket {
-  const u_char *data;
-  size_t len;
-  struct timeval *ts;
+    const u_char* data;
+    size_t len;
+    struct timeval* ts;
 };
 
 /**
@@ -20,15 +20,15 @@ struct RawPacket {
  */
 class PacketReceiver {
 public:
-  virtual ~PacketReceiver() = default;
+    virtual ~PacketReceiver() = default;
 
-  /**
-   * Open() hook.
-   */
-  virtual bool Open() { return true; }
+    /**
+     * Open() hook.
+     */
+    virtual bool Open() { return true; }
 
-  virtual bool NextPacket(RawPacket *pkt) = 0;
-  virtual void DoneWithPacket() = 0;
+    virtual bool NextPacket(RawPacket* pkt) = 0;
+    virtual void DoneWithPacket() = 0;
 };
 
 } // namespace zeek::packetsource::udp
