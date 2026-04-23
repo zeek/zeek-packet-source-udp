@@ -32,7 +32,7 @@ private:
     size_t sq_entries, cq_entries;
     size_t buffers, buf_shift, buf_size;
 
-    struct io_uring ring = {0};
+    struct io_uring ring = {{nullptr}};
     size_t buf_ring_size = 0;
 
     // mmap()'ed memory area of size of struct io_uring_buf and buffers.
@@ -46,7 +46,7 @@ private:
     size_t n = 0;                           // Number of cqes from last peek call.
     size_t i = 0;                           // Offset into cqes
 
-    struct msghdr msg = {0};
+    struct msghdr msg = {nullptr};
 };
 
 } // namespace zeek::packetsource::udp

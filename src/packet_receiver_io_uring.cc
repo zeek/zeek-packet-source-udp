@@ -68,7 +68,6 @@ int add_recvmsg_multishot(struct io_uring* ring, struct msghdr* msg, int fdidx) 
 bool IOUringPacketReceiver::Open() {
     UDPSOURCE_DEBUG("Opening...");
     int ret;
-    int flags = 0;
 
     struct io_uring_params params = {
         .sq_entries = static_cast<uint32_t>(sq_entries),
@@ -85,7 +84,7 @@ bool IOUringPacketReceiver::Open() {
     buf_ring_size = (sizeof(io_uring_buf) + buf_size) * buffers;
     UDPSOURCE_DEBUG("mmap() with buf_ring_size=%zu bytes", buf_ring_size);
 
-    mapped = mmap(NULL, buf_ring_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
+    mapped = mmap(nullptr, buf_ring_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
 
     if ( mapped == MAP_FAILED ) {
         fprintf(stderr, "mmap() failed: %s (%d)", strerror(errno), errno);
