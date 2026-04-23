@@ -356,25 +356,13 @@ double UDPSource::GetNextTimeout() {
     return ret;
 }
 
-// Statistics uses the SO_RXQ_OVFL getsockopt() call for dropped packets we
-// can see from the socket. We cannot see more, so users should also
-// monitoring drops on the actual interface outside of Zeek.
+// There's no easy way to get to dropped packets, so only
+// return byte counts for now.
+//
+// External monitoring via netstat -s -p udp is a good
+// start instead.
 void UDPSource::Statistics(PktSrc::Stats* arg_stats) {
     *arg_stats = stats;
-
-    if ( fd >= 0 ) {
-        uint32_t dropped;
-        socklen_t dropped_len = sizeof(dropped);
-        if ( getsockopt(fd, SOL_SOCKET, SO_RXQ_OVFL, &dropped, &dropped_len) == 0 ) {
-            arg_stats->dropped = stats.dropped = dropped;
-        }
-        else {
-            zeek::reporter->Error(
-                "packet-source-udp: getsockopt(SO_RXQ_OVFL) "
-                "error on fd=%d: %s (%d)",
-                fd, strerror(errno), errno);
-        }
-    }
 
     // Add invalid packets to dropped ones.
     arg_stats->dropped += invalid_packets;
