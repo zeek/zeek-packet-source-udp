@@ -2,6 +2,7 @@
 
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/types.h> // for u_char;
 
 namespace zeek::packetsource::udp {
 /**
