@@ -7,6 +7,10 @@ endif()
 
 project(Plugin)
 
+if(NOT CMAKE_SYSTEM_NAME MATCHES "Linux|FreeBSD")
+  message(FATAL_ERROR "This project is only supported on Linux or FreeBSD")
+endif()
+
 include(ZeekPlugin)
 
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" VERSION LIMIT_COUNT 1)

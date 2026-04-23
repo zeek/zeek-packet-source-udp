@@ -67,8 +67,8 @@ Per-packet timestamps are requested using the socket option ``SO_TIMESTAMP`` and
 received as [cmsg](https://man7.org/linux/man-pages/man3/cmsg.3.html) auxiliary data.
 
 For load balancing across multiple processes, the [SO_REUSEPORT](https://lwn.net/Articles/542629/)
-feature of the Linux kernel is used. FreeBSD should have this as well, but isn't tested
-and might need a bit of porting. That is, multiple Zeek worker processes will
+feature of the Linux kernel is used. FreeBSD has this as well, but it's SO_REUSEPORT_LB
+and only lightly tested. That is, multiple Zeek worker processes will
 listen on the same UDP port and the Linux kernel will do flow-balancing on the most
 outer IP/UDP header across all listening UDP sockets. As long as mirrored traffic uses a
 consistent and bi-directional (symmetric) hash of the inner flow as the outer UDP
@@ -237,6 +237,15 @@ Check and increase ``netdev_max_backlog`` if needed:
     $ sysctl -a -r net.core.netdev_max_backlog
     net.core.netdev_max_backlog = 1000
     $ sysctl -w net.core.netdev_max_backlog=10000
+
+
+## FreeBSD
+
+On FreeBSD, the default ``udp_recv_buffer_size`` of 16M is too large
+for the kernel defaults. Run the following as root and/or add it ``/etc/sysctl.conf``
+to persist the change to bump it to 64M.
+
+    $ sysctl -w kern.ipc.maxsockbuf=67108864
 
 
 ## Requirements on the Packet Mirroring Infrastructure

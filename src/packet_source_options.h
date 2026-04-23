@@ -25,8 +25,9 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <pcap/dlt.h>
-#include <string>
 #include <sys/socket.h>
+#include <cstdint>
+#include <string>
 #include <tuple>
 
 namespace zeek::packetsource::udp {
@@ -35,33 +36,33 @@ namespace zeek::packetsource::udp {
  * Configuration for the listening socket.
  */
 struct ListenOptions {
-  int af = -1;
-  union {
-    sockaddr_in v4;
-    sockaddr_in6 v6;
-  } addr = {0};
-  int port = -1;
+    int af = -1;
+    union {
+        sockaddr_in v4;
+        sockaddr_in6 v6;
+    } addr = {{0}};
+    int port = -1;
 };
 
 /**
  * The supported encapsulations.
  */
-enum class Encapsulation {
-  UNSET,
-  SKIP,
-  VXLAN,
-  GENEVE,
-  GENEVE_VXLAN, // Outer layer GENEVE, then IP/UDP+VXLAN containing the mirrored
-                // packet. There is no ethernet header after GENEVE!
+enum class Encapsulation : uint8_t {
+    UNSET,
+    SKIP,
+    VXLAN,
+    GENEVE,
+    GENEVE_VXLAN, // Outer layer GENEVE, then IP/UDP+VXLAN containing the mirrored
+                  // packet. There is no ethernet header after GENEVE!
 };
 
 /**
  * Expected encapsulation options.
  */
 struct EncapOptions {
-  Encapsulation encap = Encapsulation::UNSET;
-  int link_type = -1;
-  int skip_bytes = -1;
+    Encapsulation encap = Encapsulation::UNSET;
+    int link_type = -1;
+    int skip_bytes = -1;
 };
 
 /**
@@ -73,8 +74,7 @@ struct EncapOptions {
  *
  * If error_msg is not empty, parsing failed and the string describes the issue.
  */
-std::tuple<std::string, ListenOptions, EncapOptions>
-parse_interface_path(const std::string &path);
+std::tuple<std::string, ListenOptions, EncapOptions> parse_interface_path(const std::string& path);
 
 void test_parse_interface_path();
 

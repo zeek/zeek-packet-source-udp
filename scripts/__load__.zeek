@@ -17,7 +17,7 @@ export {
 	## The size of the socket's UDP receive buffer to configure in bytes
 	##
 	## Set this value to ``0`` to use the kernel' default.
-	const udp_recv_buffer_size = 16 * 1024 * 1024;
+	const udp_recv_buffer_size = 16 * 1024 * 1024 &redef;
 
 	## Whether to use select on the socket to wake up Zeek's IO loop.
 	##

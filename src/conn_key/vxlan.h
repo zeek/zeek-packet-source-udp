@@ -10,14 +10,11 @@ namespace zeek::packetsource::udp::conn_key {
  */
 class VxlanVniFactory : public zeek::conn_key::fivetuple::Factory {
 public:
-  static zeek::conn_key::FactoryPtr Instantiate() {
-    return std::make_unique<VxlanVniFactory>();
-  }
+    static zeek::conn_key::FactoryPtr Instantiate() { return std::make_unique<VxlanVniFactory>(); }
 
 private:
-  zeek::ConnKeyPtr DoNewConnKey() const override;
-  zeek::expected<zeek::ConnKeyPtr, std::string>
-  DoConnKeyFromVal(const zeek::Val &v) const override;
+    zeek::ConnKeyPtr DoNewConnKey() const override;
+    zeek::expected<zeek::ConnKeyPtr, std::string> DoConnKeyFromVal(const zeek::Val& v) const override;
 };
 
 } // namespace zeek::packetsource::udp::conn_key
