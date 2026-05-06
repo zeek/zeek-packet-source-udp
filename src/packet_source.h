@@ -21,10 +21,16 @@ public:
      * Return the currently stored VXLAN VNI value or -1 if VXLAN is not used.
      */
     static int VxlanVni() { return vxlan_vni; }
+
     /**
      * Return the GENEVE VNI value or -1 if GENEVE is not used.
      */
     static int GeneveVni() { return geneve_vni; }
+
+    /**
+     * Return a span to the GENEVE header data.
+     */
+    static std::span<const uint8_t> GeneveData() { return geneve_data; }
 
 protected:
     /**
@@ -81,6 +87,9 @@ private:
     // values for use in custom ConnKey values.
     static int vxlan_vni;
     static int geneve_vni;
+
+    // Globals to keep pointer/size to the GENEVE header.
+    static std::span<const uint8_t> geneve_data;
 };
 
 } // namespace zeek::packetsource::udp

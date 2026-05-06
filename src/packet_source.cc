@@ -25,6 +25,7 @@ using PktSrc = zeek::iosource::PktSrc;
 
 int UDPSource::vxlan_vni = -1;
 int UDPSource::geneve_vni = -1;
+std::span<const uint8_t> UDPSource::geneve_data;
 
 UDPSource::UDPSource(std::string path, const ListenOptions& listen_opts, const EncapOptions& encap_opts)
     : path(std::move(path)),
@@ -261,6 +262,10 @@ bool UDPSource::ExtractNextPacket(zeek::Packet* pkt) {
                 goto skip_packet_no_weird;
             }
 
+            // Remember the GENEVE header data of this packet for the
+            // get_geneve_options() bif.
+            geneve_data = {pkt_data, pkt_data_len};
+
             pkt_data += (8 + all_opt_len);
             pkt_data_len -= (8 + all_opt_len);
             pkt_data_caplen -= (8 + all_opt_len);
@@ -351,7 +356,10 @@ skip_packet_no_weird:
     return false;
 }
 
-void UDPSource::DoneWithPacket() { receiver->DoneWithPacket(); }
+void UDPSource::DoneWithPacket() {
+    geneve_data = {};
+    receiver->DoneWithPacket();
+}
 
 double UDPSource::GetNextTimeout() {
     double ret = poll_interval;
