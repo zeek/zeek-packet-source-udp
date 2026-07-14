@@ -19,3 +19,37 @@ const io_uring_sq_entries: count;
 const io_uring_cq_entries: count;
 const io_uring_buffers: count;
 const io_uring_buffer_shift: count;
+
+%%{
+#include <span>
+#include "zeek/packet_analysis/protocol/geneve/Geneve.h"
+#include "packet_source.h"
+%%}
+
+## Get the GENVE options as :zeek:see:`geneve_options_vec` as stashed away
+## by the PacketSource::UDP implementation.
+function get_geneve_options%(%): geneve_options_vec
+    %{
+    using namespace zeek::packetsource::udp;
+
+    static const auto vec_type = zeek::id::find_type<zeek::VectorType>("geneve_options_vec");
+    static const auto rec_type = zeek::id::find_type<zeek::RecordType>("PacketAnalyzer::Geneve::Option");
+
+    auto result = zeek::make_intrusive<zeek::VectorVal>(vec_type);
+
+    auto cb = [&result](uint16_t opt_class, bool opt_critical, uint8_t opt_type, std::span<const uint8_t> opt_data) -> void {
+        auto rv = zeek::make_intrusive<zeek::RecordVal>(rec_type);
+        rv->Assign(0, zeek::val_mgr->Count(opt_class));
+        rv->Assign(1, zeek::val_mgr->Bool(opt_critical));
+        rv->Assign(2, zeek::val_mgr->Count(opt_type));
+        auto sv = zeek::make_intrusive<zeek::StringVal>(opt_data.size(), reinterpret_cast<const char*>(opt_data.data()));
+        rv->Assign(3, std::move(sv));
+
+        result->Append(std::move(rv));
+    };
+
+    auto data = UDPSource::GeneveData();
+    zeek::packet_analysis::Geneve::detail::parse_options(data, cb);
+
+    return result;
+    %}

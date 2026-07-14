@@ -125,6 +125,29 @@ looks as follows:
 Note that the ConnKey implementations provided by this plugin only work with live
 traffic using the packet source in this plugin.
 
+## Accessing GENEVE Options from Zeek scripts
+
+Zeek scripts can query the GENEVE options via the ``PacketSource::UDP::get_geneve_options()``
+builtin function. This function returns a vector of ``PacketAnalyzer::Geneve::Option`` records,
+similar to the ``PacketAnalyzer::Geneve::get_options()`` function in base Zeek.
+
+    # geneve_options.zeek
+    event new_connection(c: connection)
+        {
+        print c$uid;
+
+        for ( _, opt in PacketSource::UDP::get_geneve_options() )
+            print opt;
+        }
+
+
+    $ zeek -i udp::0.0.0.0:6081:geneve geneve_options.zeek
+    CUJZ2i7bErFi6Hm41
+    [class=65280, critical=F, typ=1, data=\x01\x02\x03\x04]
+    [class=65280, critical=T, typ=2, data=hellohel]
+    CB0OtP2lVahREh9lX8
+    [class=65280, critical=F, typ=1, data=\x01\x02\x03\x04]
+    [class=65280, critical=T, typ=2, data=hellohel]
 
 ## Usage
 
