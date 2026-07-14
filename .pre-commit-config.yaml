@@ -3,9 +3,14 @@
 #
 repos:
 - repo: https://github.com/pre-commit/mirrors-clang-format
-  rev: 39233709be54124a7371a50cbfc5325bd4fb9d90  # frozen: v22.1.4
+  rev: f4d7745e17a28aad7eed2f4874ca8d1568c11c4c  # frozen: v22.1.8
   hooks:
   - id: clang-format
     types_or:
       - "c"
       - "c++"
+
+- repo: https://github.com/crate-ci/typos
+  rev: 96d9af6217dc2855210655af7e1ff19d23d4e593  # frozen: v1
+  hooks:
+    - id: typos
